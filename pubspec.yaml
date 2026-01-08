@@ -30,17 +30,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Library Database
   sqflite: ^2.3.0
-  path: ^1.8.3
-  # Library Format Tanggal & Uang
-  intl: ^0.18.1
-  # Library Kamera & Galeri
-  image_picker: ^1.0.4
-  # Library Buka WhatsApp
-  url_launcher: ^6.1.14
-  # Library Notifikasi
+  path: ^1.9.0
+  intl: ^0.19.0
+  url_launcher: ^6.2.1
   flutter_local_notifications: ^18.0.1
+  image_picker: ^1.0.4
 
 dev_dependencies:
   flutter_test:

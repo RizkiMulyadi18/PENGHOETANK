@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.pawang_pinjol"
-    compileSdk = 36
+    compileSdk = 36  //
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -31,6 +31,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
     }
 
     buildTypes {

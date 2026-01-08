@@ -126,18 +126,6 @@ class DbHelper {
     return 0.0;
   }
 
-  // 7. Hitung Jumlah Peminjam Aktif (Orang unik yang masih punya hutang)
-  Future<int> hitungJumlahPeminjam() async {
-    final db = await database;
-    // Hitung pelaku_id yang unik (DISTINCT) dari tabel hutang yang belum lunas
-    var result = await db.rawQuery('SELECT COUNT(DISTINCT pelaku_id) as total FROM hutang WHERE status_lunas = 0');
-    if (result.first['total'] != null) {
-      return result.first['total'] as int;
-    } else {
-      return 0;
-    }
-  }
-
   // 5. Fungsi Ambil Daftar Hutang Aktif (Join Tabel 1 & 2)
   Future<List<Map<String, dynamic>>> ambilHutangAktif() async {
     final db = await database;
@@ -151,25 +139,10 @@ class DbHelper {
   }
 
   // 6. Fungsi Hapus (Delete)
-  // 8. Hapus Pelaku (Bersih sampai ke akar-akarnya)
-  Future<void> hapusPelaku(int id) async {
+  // Berkat ON DELETE CASCADE, jika pelaku dihapus, hutang & cicilannya otomatis hilang
+  Future<int> hapusPelaku(int id) async {
     final db = await database;
-    
-    // Manual Cascade: Hapus anak-anaknya dulu biar tidak error
-    
-    // 1. Cari dulu semua hutang milik orang ini
-    var listHutang = await db.query('hutang', where: 'pelaku_id = ?', whereArgs: [id]);
-    
-    // 2. Hapus semua riwayat cicilan dari setiap hutang tersebut
-    for (var h in listHutang) {
-      await db.delete('riwayat_cicilan', where: 'hutang_id = ?', whereArgs: [h['id']]);
-    }
-
-    // 3. Hapus data hutangnya
-    await db.delete('hutang', where: 'pelaku_id = ?', whereArgs: [id]);
-
-    // 4. Terakhir, hapus orangnya
-    await db.delete('pelaku', where: 'id = ?', whereArgs: [id]);
+    return await db.delete('pelaku', where: 'id = ?', whereArgs: [id]);
   }
 
   // 7. Ambil Riwayat Cicilan per Hutang

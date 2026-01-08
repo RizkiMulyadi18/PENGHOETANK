@@ -9,18 +9,38 @@ class DetailHutangPage extends StatefulWidget {
   final Map<String, dynamic> dataHutang;
 
   // Kita butuh data hutang (Nama, ID, Nominal) dari halaman sebelumnya
-  const DetailHutangPage({Key? key, required this.dataHutang}) : super(key: key);
+  const DetailHutangPage({super.key, required this.dataHutang});
 
   @override
-  _DetailHutangPageState createState() => _DetailHutangPageState();
+  State<DetailHutangPage> createState() => _DetailHutangPageState();
 }
 
 class _DetailHutangPageState extends State<DetailHutangPage> {
   final DbHelper _dbHelper = DbHelper();
-  final currencyFormatter = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
-  
+  final currencyFormatter = NumberFormat.currency(
+    locale: 'id',
+    symbol: 'Rp ',
+    decimalDigits: 0,
+  );
+
   // Controller untuk input bayar
   final TextEditingController _bayarController = TextEditingController();
+  File? _selectedImage;
+
+  Future<void> _pickImage(
+    ImageSource source,
+    void Function(VoidCallback) setStateDialog,
+  ) async {
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: source,
+      imageQuality: 70,
+    );
+    if (picked == null || !mounted) return;
+    setStateDialog(() {
+      _selectedImage = File(picked.path);
+    });
+  }
 
   // Fungsi Refresh Halaman
   void _refresh() {
@@ -53,9 +73,12 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
                     ),
                   ),
                   SizedBox(height: 15),
-                  
+
                   // AREA PREVIEW FOTO
-                  Text("Bukti Foto (Opsional):", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    "Bukti Foto (Opsional):",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   SizedBox(height: 5),
                   InkWell(
                     onTap: () {
@@ -98,8 +121,15 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
-                                Text("Tap untuk foto", style: TextStyle(color: Colors.grey)),
+                                Icon(
+                                  Icons.add_a_photo,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
+                                Text(
+                                  "Tap untuk foto",
+                                  style: TextStyle(color: Colors.grey),
+                                ),
                               ],
                             ),
                     ),
@@ -107,26 +137,34 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
                 ],
               ),
               actions: [
-                TextButton(child: Text("Batal"), onPressed: () => Navigator.pop(context)),
+                TextButton(
+                  child: Text("Batal"),
+                  onPressed: () => Navigator.pop(context),
+                ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white,
+                  ),
                   child: Text("SIMPAN"),
                   onPressed: () async {
                     if (_bayarController.text.isNotEmpty) {
                       double nominal = double.parse(_bayarController.text);
-                      
+
                       await _dbHelper.tambahCicilan(
                         widget.dataHutang['id'],
                         nominal,
                         "Pembayaran via Aplikasi",
-                        _selectedImage?.path, // <--- KIRIM PATH FOTO KE DATABASE
+                        _selectedImage
+                            ?.path, // <--- KIRIM PATH FOTO KE DATABASE
                       );
 
+                      if (!mounted) return;
                       Navigator.pop(context); // Tutup Dialog
                       _refresh(); // Refresh halaman
                     }
                   },
-                )
+                ),
               ],
             );
           },
@@ -134,51 +172,44 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
       },
     );
   }
-  
-  // Variabel untuk menampung file foto sementara
-  File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
-
-  // Fungsi Membuka Kamera/Galeri
-  Future<void> _pickImage(ImageSource source, Function setStateDialog) async {
-    final XFile? photo = await _picker.pickImage(source: source, imageQuality: 50);
-    if (photo != null) {
-      // Kita pakai setStateDialog agar tampilan DI DALAM DIALOG berubah
-      setStateDialog(() {
-        _selectedImage = File(photo.path);
-      });
-    }
-  }
 
   // --- LOGIKA WHATSAPP ---
   Future<void> _kirimPesanWA() async {
     // 1. Ambil data nomor HP & Nama
     String nomor = widget.dataHutang['nomor_hp'].toString();
     String nama = widget.dataHutang['nama'];
-    
+
     // 2. Ambil sisa hutang terbaru dari database (biar akurat)
     final db = await _dbHelper.database;
-    var data = await db.query('hutang', where: 'id = ?', whereArgs: [widget.dataHutang['id']]);
+    var data = await db.query(
+      'hutang',
+      where: 'id = ?',
+      whereArgs: [widget.dataHutang['id']],
+    );
     double sisa = data.first['sisa_hutang'] as double;
-    
+
     // 3. Format Nomor HP (Ubah 08xx jadi 628xx)
     if (nomor.startsWith('0')) {
-      nomor = '62' + nomor.substring(1);
+      nomor = '62${nomor.substring(1)}';
     }
-    
+
     // 4. Buat Pesan Otomatis
     String sisaRp = currencyFormatter.format(sisa);
-    String pesan = "Halo *$nama*, sekadar mengingatkan hutangmu tersisa *$sisaRp* dan sudah jatuh tempo. Mohon segera diselesaikan ya, terima kasih! 🙏";
-    
+    String pesan =
+        "Halo *$nama*, sekadar mengingatkan hutangmu tersisa *$sisaRp* dan sudah jatuh tempo. Mohon segera diselesaikan ya, terima kasih! 🙏";
+
     // 5. Buka WhatsApp
-    final Uri url = Uri.parse("https://wa.me/$nomor?text=${Uri.encodeComponent(pesan)}");
-    
+    final Uri url = Uri.parse(
+      "https://wa.me/$nomor?text=${Uri.encodeComponent(pesan)}",
+    );
+
     try {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal membuka WhatsApp: $e")),
-      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Gagal membuka WhatsApp: $e")));
     }
   }
 
@@ -192,7 +223,10 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
         actions: [
           // TOMBOL WHATSAPP
           IconButton(
-            icon: Icon(Icons.chat, color: Colors.greenAccent), // Ikon Chat Hijau
+            icon: Icon(
+              Icons.chat,
+              color: Colors.greenAccent,
+            ), // Ikon Chat Hijau
             tooltip: 'Tagih via WA',
             onPressed: () {
               _kirimPesanWA(); // Panggil fungsi yang kita buat tadi
@@ -203,9 +237,6 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
       ),
       body: Column(
         children: [
-          // HEADER: Status Hutang
-          // ... di dalam build() ...
-          
           // HEADER: Status Hutang
           Container(
             width: double.infinity,
@@ -260,7 +291,8 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
                   itemCount: snapshot.data!.length,
                   itemBuilder: (context, index) {
                     var item = snapshot.data![index];
-                    return Card( // Bungkus pakai Card biar rapi
+                    return Card(
+                      // Bungkus pakai Card biar rapi
                       margin: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                       child: ListTile(
                         // Bagian Kiri: Menampilkan Foto Kecil atau Icon
@@ -271,7 +303,9 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
                                   showDialog(
                                     context: context,
                                     builder: (_) => Dialog(
-                                      child: Image.file(File(item['bukti_bayar'])),
+                                      child: Image.file(
+                                        File(item['bukti_bayar']),
+                                      ),
                                     ),
                                   );
                                 },
@@ -289,10 +323,21 @@ class _DetailHutangPageState extends State<DetailHutangPage> {
                                 backgroundColor: Colors.green.shade100,
                                 child: Icon(Icons.payment, color: Colors.green),
                               ),
-                        
-                        title: Text(currencyFormatter.format(item['jumlah_bayar']), style: TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(DateFormat('dd MMM yyyy - HH:mm').format(DateTime.parse(item['tanggal_bayar']))),
-                        trailing: Icon(Icons.check_circle, color: Colors.green, size: 16),
+
+                        title: Text(
+                          currencyFormatter.format(item['jumlah_bayar']),
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          DateFormat(
+                            'dd MMM yyyy - HH:mm',
+                          ).format(DateTime.parse(item['tanggal_bayar'])),
+                        ),
+                        trailing: Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 16,
+                        ),
                       ),
                     );
                   },

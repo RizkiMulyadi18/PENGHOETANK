@@ -1,7 +1,7 @@
-import 'tambah_peminjam_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // Untuk format mata uang Rp
 import '../helpers/db_helper.dart';
+import 'tambah_peminjam_page.dart';
 import 'detail_hutang_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -16,6 +16,8 @@ class _DashboardPageState extends State<DashboardPage> {
     symbol: 'Rp ',
     decimalDigits: 0,
   );
+
+  @override
   // Fungsi Helper untuk Warna
   Color _getWarnaResiko(String resiko) {
     switch (resiko) {
@@ -39,11 +41,10 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Penghoetank"),
+        title: Text("PENGHOETANK"),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),
@@ -94,22 +95,15 @@ class _DashboardPageState extends State<DashboardPage> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator());
                 }
-                // 1. EMPTY STATE (Tampilan jika kosong)
+                /// 1. EMPTY STATE (Tampilan jika kosong)
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.account_balance_wallet_outlined,
-                          size: 80,
-                          color: Colors.grey.shade300,
-                        ),
+                        Icon(Icons.account_balance_wallet_outlined, size: 80, color: Colors.grey.shade300),
                         SizedBox(height: 10),
-                        Text(
-                          "Dompet aman, belum ada yang ngutang!",
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                        Text("Dompet aman, belum ada yang ngutang!", style: TextStyle(color: Colors.grey)),
                       ],
                     ),
                   );
@@ -117,33 +111,79 @@ class _DashboardPageState extends State<DashboardPage> {
 
                 // 2. LIST DATA DENGAN TAMPILAN BARU
                 return ListView.builder(
-                  padding: EdgeInsets.only(
-                    bottom: 80,
-                  ), // Supaya list terbawah tidak tertutup tombol +
+                  padding: EdgeInsets.only(bottom: 80), // Supaya list terbawah tidak tertutup tombol +
                   itemCount: snapshot.data!.length,
                   itemBuilder: (context, index) {
                     var item = snapshot.data![index];
-
+                    
                     // Ambil level resiko (default 'Aman' jika null)
                     String resiko = item['level_resiko'] ?? 'Aman';
 
-                    return Card(
-                      elevation: 4, // Efek bayangan (Shadow)
-                      shadowColor: Colors.black26,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
+                    // ID harus unik (String), kita pakai ID dari database
+                    return Dismissible(
+                      key: Key(item['id'].toString()),
+                      direction: DismissDirection
+                          .endToStart, // Geser dari kanan ke kiri
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: EdgeInsets.only(right: 20),
+                        color: Colors.red,
+                        child: Icon(Icons.delete, color: Colors.white),
                       ),
+                      confirmDismiss: (direction) async {
+                        // Tampilkan Dialog Konfirmasi sebelum hapus
+                        return await showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text("Hapus Data?"),
+                            content: Text(
+                              "Yakin ingin menghapus ${item['nama']}? Semua data hutang & fotonya akan hilang permanen.",
+                            ),
+                            actions: [
+                              TextButton(
+                                child: Text("Batal"),
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: Text("Hapus"),
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      onDismissed: (direction) async {
+                        // 1. Hapus dari Database
+                        await _dbHelper.hapusPelaku(item['id']);
+
+                        // 2. Tampilkan pesan sukses (Snack bar)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("${item['nama']} berhasil dihapus"),
+                          ),
+                        );
+
+                        // 3. Refresh halaman (Optional, karena onDismissed sudah menghapus UI sementara)
+                        setState(() {});
+                      },
+                      // --- INI KODINGAN CARD YANG LAMA (JANGAN DIUBAH, CUMA DIBUNGKUS) ---
+                      child: Card(
+                        elevation: 4, // Efek bayangan (Shadow)
+                      shadowColor: Colors.black26,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       margin: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      child: InkWell(
-                        // Efek percikan air saat diklik
+                      child: InkWell( // Efek percikan air saat diklik
                         borderRadius: BorderRadius.circular(15),
                         onTap: () async {
-                          // Navigasi ke Detail
-                          await Navigator.push(
+                           // Navigasi ke Detail
+                           await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  DetailHutangPage(dataHutang: item),
+                              builder: (context) => DetailHutangPage(dataHutang: item),
                             ),
                           );
                           setState(() {});
@@ -161,39 +201,29 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                     color: _getWarnaTeks(resiko),
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 20,
+                                    fontSize: 20
                                   ),
                                 ),
                               ),
                               SizedBox(width: 15),
-
+                              
                               // NAMA & TANGGAL
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      item['nama'],
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
+                                      item['nama'], 
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
                                     ),
                                     SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Icon(
-                                          Icons.calendar_today,
-                                          size: 12,
-                                          color: Colors.grey,
-                                        ),
+                                        Icon(Icons.calendar_today, size: 12, color: Colors.grey),
                                         SizedBox(width: 4),
                                         Text(
-                                          item['jatuh_tempo'],
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
+                                          item['jatuh_tempo'], 
+                                          style: TextStyle(fontSize: 12, color: Colors.grey)
                                         ),
                                       ],
                                     ),
@@ -206,44 +236,35 @@ class _DashboardPageState extends State<DashboardPage> {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    currencyFormatter.format(
-                                      item['sisa_hutang'],
-                                    ),
+                                    currencyFormatter.format(item['sisa_hutang']),
                                     style: TextStyle(
-                                      color: Colors.indigo,
+                                      color: Colors.indigo, 
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 14
                                     ),
                                   ),
                                   // Badge Kecil Level Resiko
                                   Container(
                                     margin: EdgeInsets.only(top: 5),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
+                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: _getWarnaResiko(resiko),
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(8)
                                     ),
                                     child: Text(
-                                      resiko,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: _getWarnaTeks(resiko),
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      resiko, 
+                                      style: TextStyle(fontSize: 10, color: _getWarnaTeks(resiko), fontWeight: FontWeight.bold)
                                     ),
-                                  ),
+                                  )
                                 ],
                               ),
                             ],
                           ),
                         ),
                       ),
+                      ),
                     );
                   },
-                  
                 );
               },
             ),
